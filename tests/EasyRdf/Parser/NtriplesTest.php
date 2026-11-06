@@ -169,6 +169,32 @@ class NtriplesTest extends TestCase
         $this->assertSame("\t", $b->getValue());
     }
 
+    /**
+     * @dataProvider escapedBackslashProvider
+     */
+    public function testParseEscapedBackslash($literal, $expected)
+    {
+        $this->parser->parse(
+            $this->graph,
+            '<http://example.com/a> <http://example.com/b> "'.$literal.'" .',
+            'ntriples',
+            null
+        );
+
+        $b = $this->graph->get('http://example.com/a', '<http://example.com/b>');
+        $this->assertSame($expected, $b->getValue());
+    }
+
+    public static function escapedBackslashProvider()
+    {
+        return [
+            'backslash alone' => ['\\\\', '\\'],
+            'backslash before r' => ['\\\\rm', '\\rm'],
+            'backslash before u' => ['\\\\u0041', '\\u0041'],
+            'LaTeX' => ['\\\\(A_{\\\\rm{e}}\\\\)', '\\(A_{\\rm{e}}\\)'],
+        ];
+    }
+
     public function testParseUnicode1()
     {
         $count = $this->parser->parse(

@@ -67,42 +67,52 @@ class Ntriples extends Parser
             'n' => \chr(0x0A),
             'r' => \chr(0x0D),
             'f' => \chr(0x0C),
-            '\"' => \chr(0x22),
+            '"' => \chr(0x22),
             '\'' => \chr(0x27),
+            '\\' => \chr(0x5C),
         ];
-        foreach ($mappings as $in => $out) {
-            $str = preg_replace('/\x5c(['.$in.'])/', $out, $str);
+
+        // One pass, so that the character after an escaped backslash is not decoded again.
+        return preg_replace_callback(
+            '/\x5c(?:([tbnrf"\'\x5c])|u([0-9A-F]{4})|U([0-9A-F]{8}))/',
+            function ($matches) use ($mappings) {
+                if ('' !== $matches[1]) {
+                    return $mappings[$matches[1]];
+                }
+
+                return $this->encodeCodePoint(hexdec($matches[3] ?? $matches[2]));
+            },
+            $str
+        );
+    }
+
+    /**
+     * UTF-8 encoding of a Unicode code point.
+     *
+     * @param int $no the code point
+     *
+     * @return string the UTF-8 bytes
+     */
+    private function encodeCodePoint($no)
+    {
+        if ($no < 128) {                // 0x80
+            return \chr($no);
+        } elseif ($no < 2048) {         // 0x800
+            return \chr(($no >> 6) + 192).
+                   \chr(($no & 63) + 128);
+        } elseif ($no < 65536) {        // 0x10000
+            return \chr(($no >> 12) + 224).
+                   \chr((($no >> 6) & 63) + 128).
+                   \chr(($no & 63) + 128);
+        } elseif ($no < 2097152) {      // 0x200000
+            return \chr(($no >> 18) + 240).
+                   \chr((($no >> 12) & 63) + 128).
+                   \chr((($no >> 6) & 63) + 128).
+                   \chr(($no & 63) + 128);
         }
 
-        if (false === stripos($str, '\u')) {
-            return $str;
-        }
-
-        while (preg_match('/\\\(U)([0-9A-F]{8})/', $str, $matches)
-               || preg_match('/\\\(u)([0-9A-F]{4})/', $str, $matches)) {
-            $no = hexdec($matches[2]);
-            if ($no < 128) {                // 0x80
-                $char = \chr($no);
-            } elseif ($no < 2048) {         // 0x800
-                $char = \chr(($no >> 6) + 192).
-                        \chr(($no & 63) + 128);
-            } elseif ($no < 65536) {        // 0x10000
-                $char = \chr(($no >> 12) + 224).
-                        \chr((($no >> 6) & 63) + 128).
-                        \chr(($no & 63) + 128);
-            } elseif ($no < 2097152) {      // 0x200000
-                $char = \chr(($no >> 18) + 240).
-                        \chr((($no >> 12) & 63) + 128).
-                        \chr((($no >> 6) & 63) + 128).
-                        \chr(($no & 63) + 128);
-            } else {
-                // FIXME: throw an exception instead?
-                $char = '';
-            }
-            $str = str_replace('\\'.$matches[1].$matches[2], $char, $str);
-        }
-
-        return $str;
+        // FIXME: throw an exception instead?
+        return '';
     }
 
     /**

@@ -117,6 +117,22 @@ class TurtleTest extends TestCase
         );
     }
 
+    public function testParseEscapedBackslash()
+    {
+        $graph = new Graph();
+        $this->turtleParser->parse(
+            $graph,
+            '<http://example.com/s> <http://example.com/p> "\\\\(A_{\\\\rm{e}}\\\\)" .',
+            'turtle',
+            $this->baseUri
+        );
+
+        $this->assertSame(
+            '\\(A_{\\rm{e}}\\)',
+            $graph->get('http://example.com/s', '<http://example.com/p>')->getValue()
+        );
+    }
+
     public function testParseUnsupportedFormat()
     {
         $this->expectException('EasyRdf\Exception');
